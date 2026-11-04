@@ -1,0 +1,11 @@
+# Smoke test of the TensorRT path (minutes): hybrid.yaml on 2 scenes, 1 seed.
+experiment: smoke_hybrid
+load_dtype: bfloat16
+attn_implementation: sdpa
+optimizations: {prefill_last_logit_only: true}
+trt: {vision_engine: "${ORINBENCH_ENGINES}/vision.engine", expert_engine: "${ORINBENCH_ENGINES}/expert.engine", expert_graph: true}
+plan: {warmup_min: 2, warmup_max: 2, n_varied: 3, n_repeated: 1, n_staged: 2, max_minutes: 5}
+n_scenes: 2
+behavior: {seeds: [0], n_scenes: 2}
+configs:
+  - {name: reasoning, max_generation_length: 50, common_flow_noise: true}
