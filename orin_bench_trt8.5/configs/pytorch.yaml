@@ -1,0 +1,13 @@
+# Reference: best behavior-preserving PyTorch BF16 configuration. Both optimizations give the same outputs as the
+# unmodified rollout: prefill computes logits for the last position only, and the expert replays CUDA graphs.
+# Outputs: 25 scenes x seeds 0-3 with common flow noise, so they pair one-to-one with hybrid.yaml (orinbench.cli compare).
+# force_traj forces <|traj_future_start|> (no reasoning; NOT behavior-preserving) and pairs with hybrid's force_traj.
+experiment: pytorch
+load_dtype: bfloat16
+attn_implementation: sdpa
+optimizations: {prefill_last_logit_only: true, expert_cuda_graph: {max_batch_size: 1, max_graphs: 4}}
+plan: {warmup_min: 3, warmup_max: 8, n_varied: 100, n_repeated: 10, n_staged: 5, max_minutes: 30}
+behavior: {seeds: [0, 1, 2, 3], n_scenes: 25}
+configs:
+  - {name: official, max_generation_length: 256, common_flow_noise: true}
+  - {name: force_traj, max_generation_length: 256, common_flow_noise: true, force_tokens: ["<|traj_future_start|>"]}

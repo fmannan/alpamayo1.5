@@ -1,0 +1,13 @@
+# Inference dependencies of src/alpamayo1_5 and orinbench, at the versions pyproject.toml pins.
+# torch / torchvision are installed separately (built for sm_87 on the Orin, see scripts/setup_venv.sh).
+transformers==4.57.1
+accelerate==1.12.0
+einops>=0.8.1
+hydra-core>=1.3.2
+hydra-colorlog>=1.2.0
+pillow>=12.0.0
+safetensors
+pyyaml
+numpy
+scipy
+pandas>=2.3.3

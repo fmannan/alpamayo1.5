@@ -1,0 +1,14 @@
+# TensorRT FP16 vision + expert engines (scripts/build_engines.sh), PyTorch BF16 LLM, one process.
+# Not numerically identical to PyTorch: compare its behavior.jsonl with pytorch.yaml's before trusting the latency.
+# Reasoning budget 50 tokens: the expert engine is fixed at 3,136 KV tokens (3,086 prompt + 50). Reasoning on the
+# 25 scenes has been well under 50 tokens; rate_traj_start_emitted in summary.json shows whether any call hit the budget.
+experiment: hybrid
+load_dtype: bfloat16
+attn_implementation: sdpa
+optimizations: {prefill_last_logit_only: true}
+trt: {vision_engine: "${ORINBENCH_ENGINES}/vision.engine", expert_engine: "${ORINBENCH_ENGINES}/expert.engine", expert_graph: true}
+plan: {warmup_min: 3, warmup_max: 8, n_varied: 100, n_repeated: 5, n_staged: 5, max_minutes: 30}
+behavior: {seeds: [0, 1, 2, 3], n_scenes: 25}
+configs:
+  - {name: reasoning, max_generation_length: 50, common_flow_noise: true}
+  - {name: force_traj, max_generation_length: 50, common_flow_noise: true, force_tokens: ["<|traj_future_start|>"]}

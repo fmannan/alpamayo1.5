@@ -1,0 +1,5 @@
+# Extra packages for the export host (x86 or aarch64, CPU is enough): ONNX export and scene preparation.
+# Install on top of requirements.txt and a regular torch==2.8.0 / torchvision==0.23.0 build.
+-r requirements.txt
+onnx
+physical-ai-av==0.2.0
