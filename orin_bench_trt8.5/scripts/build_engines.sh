@@ -5,6 +5,7 @@
 #   expert.engine  one flow step over a 3,136-token KV cache                                 gate: relative L2 <= 0.005,
 #                  eager and through a CUDA graph with rewritten inputs
 # Inputs: $ORINBENCH_WORK/onnx/{vision,expert}/ and parity/{vision,expert}/ (scripts/export_onnx.sh, capture_expert_refs.sh).
+# An engine that passed gets a <engine>.gated marker; without references it is kept but left ungated.
 # Each build takes 10-20 minutes and up to 32 GB of builder workspace. usage: build_engines.sh [--reuse] [vision|expert]...
 set -uo pipefail
 . "$(dirname "$0")/../env.sh"
@@ -34,10 +35,17 @@ build_one() {  # build_one PART GATE
       || { ob_log "$part: build FAILED"; grep -E "\[E\]|ERROR" "$OUT/${part}_build.log" | head -5; rm -f "$engine"; return 1; }
     ob_log "$part: built in $((SECONDS - t0)) s"
   fi
+  rm -f "$engine.gated"
+  if [ ! -d "$ORINBENCH_WORK/parity/$part" ]; then
+    ob_log "$part: no parity references in $ORINBENCH_WORK/parity/$part: engine kept UNGATED (run.sh refuses it)."
+    ob_log "$part: create the references, then run: build_engines.sh --reuse $part"
+    return 1
+  fi
   ob_log "$part: parity gate"
   if ! python -u -m orinbench.trt_stage "$gate" --engine "$engine" --parity "$ORINBENCH_WORK/parity/$part" > "$OUT/${part}_gate.log" 2>&1; then
     ob_log "$part: parity gate FAILED, engine deleted"; grep -iv warn "$OUT/${part}_gate.log" | tail -4; rm -f "$engine"; return 1
   fi
+  sha256sum "$engine" | cut -c1-64 > "$engine.gated"  # run.sh uses only engines that passed their gate
   grep -E "^s[0-9]+_" "$OUT/${part}_gate.log" | cut -c1-220
   ob_log "$part: timing and per-layer profile"
   local common=(--loadEngine="$engine" --noDataTransfers --useSpinWait --duration=0)

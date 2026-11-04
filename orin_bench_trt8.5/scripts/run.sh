@@ -17,7 +17,10 @@ CFG=$ORINBENCH_DIR/configs/$MODE.yaml
 ob_need_weights
 [ -f "$ORINBENCH_SCENES/manifest.json" ] || ob_die "no scene packs in $ORINBENCH_SCENES"
 if grep -q "^trt:" "$CFG"; then
-  for e in vision expert; do [ -s "$ORINBENCH_ENGINES/$e.engine" ] || ob_die "missing $ORINBENCH_ENGINES/$e.engine (scripts/build_engines.sh)"; done
+  for e in vision expert; do
+    [ -s "$ORINBENCH_ENGINES/$e.engine" ] || ob_die "missing $ORINBENCH_ENGINES/$e.engine (scripts/build_engines.sh)"
+    [ -f "$ORINBENCH_ENGINES/$e.engine.gated" ] || ob_die "$e.engine has not passed its parity gate (scripts/build_engines.sh --reuse $e)"
+  done
   [ -s "$ORINBENCH_DIR/trt_bridge/libtrt_stage.so" ] || "$ORINBENCH_DIR/trt_bridge/build.sh" > /dev/null || ob_die "trt_bridge/build.sh failed"
 fi
 mkdir -p "$ORINBENCH_HOME/logs" "$ORINBENCH_RESULTS"; cd "$ORINBENCH_DIR"

@@ -1,0 +1,194 @@
+{
+  "stage_means_ms": {
+    "pytorch": {
+      "preprocess_cpu": 94.8149568401277,
+      "h2d": 9.450542833656073,
+      "pre_vision": 6.894319225102663,
+      "vision": 925.965744163841,
+      "llm_prefill": 2893.1809719651937,
+      "decode": 1712.1654585003853,
+      "expert_prep": 1.9599933177232742,
+      "flow": 874.1600637324154,
+      "postprocess": 9.421006869524717
+    },
+    "hybrid": {
+      "preprocess_cpu": 93.14168421551585,
+      "h2d": 9.411605354398489,
+      "pre_vision": 6.917777750641108,
+      "vision": 863.1089773960412,
+      "llm_prefill": 2885.651489906013,
+      "decode": 1712.8299148753285,
+      "expert_prep": 1.90248666331172,
+      "flow": 909.1747172176838,
+      "postprocess": 9.023076388984919
+    }
+  },
+  "engines": {
+    "vision": {
+      "median_ms": 865.633,
+      "graph_median_ms": 870.043,
+      "gate": [
+        "s00_030c760c_5100ms {\"ms_p50\": 848.5361030325294, \"outputs\": {\"deepstack0\": {\"finite\": true, \"relative_l2\": 0.008980026695465493}, \"deepstack1\": {\"finite\": true, \"relative_l2\": 0.011552505661041951}, \"deepstack2\": {\"finite\": true, \"relative_l2\": 0.011255266606065373}, \"merged\": {\"finite\": true, \"relative_l2\": 0.015466218678652468}}}",
+        "s02_a8dd5ceb_5100ms {\"ms_p50\": 837.36931392923, \"outputs\": {\"deepstack0\": {\"finite\": true, \"relative_l2\": 0.009705218676683707}, \"deepstack1\": {\"finite\": true, \"relative_l2\": 0.013996654954319926}, \"deepstack2\": {\"finite\": true, \"relative_l2\": 0.012531508889574041}, \"merged\": {\"finite\": true, \"relative_l2\": 0.026694167045494814}}}",
+        "s14_4b11c90e_5100ms {\"ms_p50\": 848.2035519555211, \"outputs\": {\"deepstack0\": {\"finite\": true, \"relative_l2\": 0.013111278039637254}, \"deepstack1\": {\"finite\": true, \"relative_l2\": 0.022780309009347997}, \"deepstack2\": {\"finite\": true, \"relative_l2\": 0.025345701765725672}, \"merged\": {\"finite\": true, \"relative_l2\": 0.04434960809933277}}}"
+      ],
+      "profile": {
+        "n_layers": 12,
+        "total_ms": 867.0465426000001,
+        "by_type_ms": {
+          "other": 867.0465426
+        },
+        "top": [
+          [
+            "{ForeignNode[visual.pos_embed.weight...(Unnamed Layer* 11347) [ElementWise]]}",
+            852.499
+          ],
+          [
+            "/visual/patch_embed/proj/Conv",
+            11.4545
+          ],
+          [
+            "/visual/patch_embed/Cast",
+            1.16548
+          ],
+          [
+            "Reformatting CopyNode for Output Tensor 3 to {ForeignNode[visual.pos_embed.weigh",
+            0.438353
+          ],
+          [
+            "Reformatting CopyNode for Output Tensor 2 to {ForeignNode[visual.pos_embed.weigh",
+            0.432701
+          ]
+        ]
+      }
+    },
+    "expert": {
+      "median_ms": 96.2766,
+      "graph_median_ms": 88.946,
+      "gate": [
+        "s00_030c760c_5100ms eager {\"ms_p50\": 95.54846212267876, \"finite\": true, \"relative_l2\": {\"vs_float32\": 0.0024763681135067405, \"vs_bf16_pytorch\": 0.0040207643060410974}}",
+        "s02_a8dd5ceb_5100ms eager {\"ms_p50\": 95.54852731525898, \"finite\": true, \"relative_l2\": {\"vs_float32\": 0.0017865668770074513, \"vs_bf16_pytorch\": 0.002952670807774498}}",
+        "s00_030c760c_5100ms graph {\"ms_p50\": 89.06124997884035, \"finite\": true, \"relative_l2\": {\"vs_float32\": 0.0024763681135067405, \"vs_bf16_pytorch\": 0.0040207643060410974}}",
+        "s02_a8dd5ceb_5100ms graph {\"ms_p50\": 88.82278483361006, \"finite\": true, \"relative_l2\": {\"vs_float32\": 0.0017865668770074513, \"vs_bf16_pytorch\": 0.002952670807774498}}"
+      ],
+      "profile": {
+        "n_layers": 3026,
+        "total_ms": 123.82240746,
+        "by_type_ms": {
+          "mask input conversion": 3.35086,
+          "other": 11.675054780000007,
+          "norms": 21.166247860000002,
+          "attention projections": 8.392423090000001,
+          "KV expand + layout (GQA)": 34.82215209999998,
+          "rotary": 2.2642053,
+          "attention scores + softmax": 17.654088329999997,
+          "MLP": 24.497376000000013
+        },
+        "top": [
+          [
+            "Reformatting CopyNode for Network Input attention_mask",
+            3.35086
+          ],
+          [
+            "/expert/layers.35/mlp/up_proj/MatMul || /expert/layers.35/mlp/gate_proj/MatMul",
+            0.493725
+          ],
+          [
+            "/expert/layers.34/mlp/up_proj/MatMul || /expert/layers.34/mlp/gate_proj/MatMul",
+            0.491232
+          ],
+          [
+            "/expert/layers.33/mlp/up_proj/MatMul || /expert/layers.33/mlp/gate_proj/MatMul",
+            0.482795
+          ],
+          [
+            "/expert/layers.32/mlp/up_proj/MatMul || /expert/layers.32/mlp/gate_proj/MatMul",
+            0.480648
+          ]
+        ]
+      }
+    }
+  },
+  "comparisons": [
+    {
+      "pytorch": "official",
+      "hybrid": "reasoning",
+      "aggregate": {
+        "n_test": 100,
+        "n_reference": 100,
+        "n_paired_finite": 100,
+        "n_test_only": 0,
+        "n_reference_only": 0,
+        "finite_rate": 1.0,
+        "reasoning_complete_rate": 1.0,
+        "identical_reasoning_rate": 1.0,
+        "vs_ref_ade_3.0s_mean": 0.003019178777085721,
+        "vs_ref_ade_3.0s_p90": 0.006458202819907786,
+        "vs_ref_ade_3.0s_max": 0.020436932036222717,
+        "vs_ref_fde_3.0s_mean": 0.009055307031805843,
+        "vs_ref_fde_3.0s_p90": 0.01879934640699522,
+        "vs_ref_fde_3.0s_max": 0.06130143979304774,
+        "vs_ref_ade_6.4s_mean": 0.015236461900247342,
+        "vs_ref_ade_6.4s_p90": 0.029982794861793883,
+        "vs_ref_ade_6.4s_max": 0.09180968602432077,
+        "vs_ref_fde_6.4s_mean": 0.04634238358383217,
+        "vs_ref_fde_6.4s_p90": 0.10246197028172754,
+        "vs_ref_fde_6.4s_max": 0.3487224351405345,
+        "test_vs_logged_path_ade_3.0s_mean": 0.2688030336331576,
+        "test_vs_logged_path_fde_3.0s_mean": 0.8601509404368699,
+        "test_vs_logged_path_ade_6.4s_mean": 1.536153847426176,
+        "test_vs_logged_path_fde_6.4s_mean": 4.68454637631774,
+        "reference_vs_logged_path_ade_3.0s_mean": 0.2688741498859599,
+        "reference_vs_logged_path_fde_3.0s_mean": 0.8601719988696277,
+        "reference_vs_logged_path_ade_6.4s_mean": 1.5338544353842736,
+        "reference_vs_logged_path_fde_6.4s_mean": 4.673798926472664
+      },
+      "seed_spread": {
+        "pairs": 150,
+        "seed_pair_ade_6.4s_mean": 0.9469551179414369,
+        "seed_pair_ade_6.4s_p90": 2.1483110738812705,
+        "seed_pair_fde_6.4s_mean": 3.184582049539488
+      }
+    },
+    {
+      "pytorch": "force_traj",
+      "hybrid": "force_traj",
+      "aggregate": {
+        "n_test": 100,
+        "n_reference": 100,
+        "n_paired_finite": 100,
+        "n_test_only": 0,
+        "n_reference_only": 0,
+        "finite_rate": 1.0,
+        "reasoning_complete_rate": 0.0,
+        "identical_reasoning_rate": 1.0,
+        "vs_ref_ade_3.0s_mean": 0.0025704173876778215,
+        "vs_ref_ade_3.0s_p90": 0.006741068791254261,
+        "vs_ref_ade_3.0s_max": 0.012803567345809749,
+        "vs_ref_fde_3.0s_mean": 0.0078765796650632,
+        "vs_ref_fde_3.0s_p90": 0.023713517976341886,
+        "vs_ref_fde_3.0s_max": 0.03781101954493019,
+        "vs_ref_ade_6.4s_mean": 0.01445657783920194,
+        "vs_ref_ade_6.4s_p90": 0.03703731226299373,
+        "vs_ref_ade_6.4s_max": 0.1002249383587775,
+        "vs_ref_fde_6.4s_mean": 0.045803150996298454,
+        "vs_ref_fde_6.4s_p90": 0.10375912655120893,
+        "vs_ref_fde_6.4s_max": 0.38731419475894624,
+        "test_vs_logged_path_ade_3.0s_mean": 0.27271610270254315,
+        "test_vs_logged_path_fde_3.0s_mean": 0.8699045354966074,
+        "test_vs_logged_path_ade_6.4s_mean": 1.5691553626954555,
+        "test_vs_logged_path_fde_6.4s_mean": 4.805484840869903,
+        "reference_vs_logged_path_ade_3.0s_mean": 0.27282858759630474,
+        "reference_vs_logged_path_fde_3.0s_mean": 0.8698432775679976,
+        "reference_vs_logged_path_ade_6.4s_mean": 1.5659597807377577,
+        "reference_vs_logged_path_fde_6.4s_mean": 4.793800405114889
+      },
+      "seed_spread": {
+        "pairs": 150,
+        "seed_pair_ade_6.4s_mean": 0.964976062167878,
+        "seed_pair_ade_6.4s_p90": 1.9940444986978476,
+        "seed_pair_fde_6.4s_mean": 3.2580780316935782
+      }
+    }
+  ]
+}

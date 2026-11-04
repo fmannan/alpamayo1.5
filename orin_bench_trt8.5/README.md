@@ -11,24 +11,33 @@ the engines. It does not install the package, whose dependencies include flash-a
 
 ## What to expect
 
-These are measurements from one Orin (MAXN, GPU at 1,300.5 MHz) and are not guaranteed for another device.
+From a clean run of this kit on one Jetson AGX Orin 64 GB (MAXN, GPU at 1,300.5 MHz), 2026-11-04. The full report, with
+figures, profile and bottleneck analysis, is [`reports/2026-11-04_agx-orin/REPORT.md`](reports/2026-11-04_agx-orin/REPORT.md).
+Another device can differ.
+
+| 100 calls per config | p50 | p99 |
+|---|---|---|
+| pytorch, with reasoning | 6,563 ms | 7,959 ms |
+| hybrid, with reasoning | 6,553 ms | 7,683 ms |
+| pytorch, forced trajectory (no reasoning; not behavior-preserving) | 5,139 ms | 5,159 ms |
+| hybrid, forced trajectory | 4,875 ms | 4,888 ms |
 
 | | Value |
 |---|---|
-| pytorch, end to end p50 / p99 | 6,595 / 7,952 ms |
-| hybrid, end to end p50 / p99 | 6,559 / 7,689 ms (0.55 % faster: not an established speedup) |
-| hybrid, forced trajectory (no reasoning) p50 | 4,924 ms |
-| vision engine / expert engine (trtexec GPU compute median) | 866.5 ms / 97.2 ms (88.9 ms with a CUDA graph) |
-| hybrid vs pytorch outputs, 100 scene/seed pairs | reasoning identical on 100/100; trajectories 1.5 cm apart on average (max 8.7 cm), against a ~95 cm spread between seeds; error vs the logged path +2.5 mm |
+| Engines (trtexec GPU compute median) | vision 865.6 ms; expert 96.3 ms per flow step (88.9 ms with a CUDA graph) |
+| Hybrid vs pytorch outputs, 100 scene/seed pairs | reasoning identical on 100/100; trajectories 1.5 cm apart on average (max 9.2 cm), against a 95 cm spread between seeds; error vs the logged path 1.534 -> 1.536 m |
+| Where a call goes (hybrid) | LLM prefill 44 %, LLM decode 26 % (112 ms per token), flow 14 %, vision 13 % |
 
-Most of the time is in the LLM, which stays in PyTorch. Prefill takes about 2.9 s and decode about 1.7 s. Stock TensorRT
-8.5 is slower than PyTorch for this LLM, so it is not part of this kit.
+The hybrid is not faster with reasoning. The LLM is 70 % of a call and stays in PyTorch in both backends: stock TensorRT
+8.5 is slower than PyTorch for this LLM, so it is not part of this kit. Prefill, decode and vision already run at 60-70 % of
+the device's compute or bandwidth limits. The TensorRT expert is the one stage far from its floor, mostly because of
+per-step KV expansion for grouped-query attention. See the report's "Bottlenecks".
 
 ## Requirements
 
 | Requirement | Why |
 |---|---|
-| Jetson AGX Orin, **64 GB** module | The BF16 model needs ~22 GB, and the hybrid process peaks at ~35 GB of the shared RAM. |
+| Jetson AGX Orin, **64 GB** module | The BF16 model needs ~22 GB. A run peaks at 31-35 GB of the shared RAM, plus whatever sits in `/dev/shm`. |
 | JetPack 5.1.x (L4T R35), TensorRT 8.5, `trtexec` | The engines are built and run on the device. They are specific to the device and the TensorRT version. |
 | `cuda-toolkit-12-2` and `cuda-compat-12-2` (one-time, root) | PyTorch is built for CUDA 12.2. The compat package supplies a 12.2 driver on top of JetPack 5.1's 11.4 driver. |
 | `g++` | Builds the TensorRT bridge (`trt_bridge/`). |
@@ -92,8 +101,8 @@ orin_bench_trt8.5/scripts/capture_expert_refs.sh   # -> $ORINBENCH_WORK/parity/e
 
 **Reusing validated artifacts instead of steps 1-3.** If you have the validated ONNX, parity references and scene packs, put
 them at `$ORINBENCH_WORK/onnx/{vision,expert}/`, `$ORINBENCH_WORK/parity/{vision,expert}/` and `$ORINBENCH_SCENES/`, then run
-`scripts/verify_artifacts.sh`. It checks every file against `checksums/{onnx,parity,scenes}.sha256`. `orinbench.export vision` reproduces the
-validated vision ONNX byte for byte, all 371 files.
+`scripts/verify_artifacts.sh onnx parity scenes`. It checks every file against `checksums/*.sha256`. `orinbench.export vision`
+reproduces the validated vision ONNX byte for byte, all 371 files. `verify_artifacts.sh weights` checks a copied checkpoint.
 
 **4. Engines.** Build, gate, time and profile them on the Orin. This takes 30-40 minutes.
 
@@ -107,7 +116,8 @@ The gates use the parity references from real scenes:
 * expert: relative L2 at most 0.005 against float32 (validated 0.0018-0.0027), both eagerly and through a CUDA graph with
   rewritten inputs.
 
-An engine that fails its gate is deleted. Engines rebuilt on another device can choose different kernels, so expect
+An engine that fails its gate is deleted; one that passes gets a `<engine>.gated` marker, and `run.sh` uses only marked
+engines. Engines rebuilt on another device can choose different kernels, so expect
 millimetre-level output differences from the validated numbers, not bit-identical results.
 
 **5. Runs.**
@@ -137,23 +147,46 @@ Timing protocol (`orinbench/runner.py`):
 Latency is measured from input ready to trajectory ready: decoded uint8 frames and ego history in host memory, through to
 the trajectory copied back to the host.
 
+**6. Report.** On any machine that can read both run directories (needs matplotlib):
+
+```bash
+python -m orinbench.report --pytorch $ORINBENCH_RESULTS/<time>_pytorch --hybrid $ORINBENCH_RESULTS/<time>_hybrid \
+    --engines $ORINBENCH_RESULTS/engines_* --scenes $ORINBENCH_SCENES --out report/
+```
+
+It writes `report/REPORT.md` with latency, the per-stage breakdown, engine timings, the expert engine's time by layer type,
+output agreement and memory, and figures in `report/figures/`.
+
+### Orins without spare disk
+
+If the only space is `/dev/shm` (a stock 64 GB eMMC with ~1 GB free), RAM holds everything. A 22 GB checkpoint plus 5.8 GB
+of engines leaves too little for a 100-call run (pytorch peaks at ~33 GB, hybrid at ~35 GB). This order fits:
+
+1. Copy the ONNX and vision references to `$ORINBENCH_WORK`, run `build_engines.sh`, then delete `$ORINBENCH_WORK/onnx`.
+   The vision engine passes its gate. The expert engine is kept but left ungated, because its references need the model.
+2. Copy the checkpoint, run `capture_expert_refs.sh` then `build_engines.sh --reuse expert`, then delete
+   `$ORINBENCH_WORK/parity/expert`.
+3. `run.sh pytorch` fits with the checkpoint in `/dev/shm` as long as the ONNX and expert references are gone (peak 52 GB
+   in the clean run). `run.sh hybrid` also holds the engines, so use `run.sh hybrid --drop-weights-after-load`: it deletes
+   the RAM copy of the checkpoint once loaded (peak 40 GB). Copy the checkpoint again before the next run.
+
+Downloading the checkpoint on the Orin itself (`huggingface-cli download nvidia/Alpamayo-1.5-10B --revision
+7aba8293c09993f2e125c6819df05d7fa3e873ea --local-dir ...`, with a token that has access) took about 7 minutes in the clean
+run. Check it with `verify_artifacts.sh weights`.
+
 ## Verified on
 
-One Jetson AGX Orin 64 GB (JetPack 5.1, L4T R35.2.1, TensorRT 8.5.2, MAXN, GPU at 1,300.5 MHz), 2026-11-03, with the
-validated ONNX, parity references and scene packs (all matching `checksums/`) and the engines built from them:
+The clean run behind "What to expect" used every step of this kit from an empty `/dev/shm`, on a stock Orin whose eMMC
+had 1 GB free (so everything lived in RAM, in the order of "Orins without spare disk"):
 
-| Step | Result |
-|---|---|
-| `preflight.sh` | 0 FAIL |
-| `trt_bridge/build.sh` | builds |
-| `verify_artifacts.sh parity scenes` | all 190 files match |
-| `build_engines.sh --reuse` (gates, timing, profile) | vision passed: deepstack relative L2 0.009-0.023; expert passed: 0.0027 / 0.0018 vs float32, identical after CUDA-graph replay. GPU compute 865 ms / 95.7 ms (88.7 ms with a graph) |
-| `run.sh smoke` | 3 calls, p50 6,949 ms, every call emitted a trajectory |
-| `run.sh smoke_hybrid` | 3 calls, p50 6,890 ms; same reasoning as `smoke` on both scenes, trajectories 4.3 cm apart (ADE 6.4 s); peak RAM 57.8 of 61 GB with a 26 GB checkpoint + engines in `/dev/shm` |
+* The ONNX exports reproduced the validated files byte for byte (`checksums/onnx.sha256`).
+* The checkpoint was downloaded on the Orin and checked against `checksums/weights.sha256`.
+* Both engines were built fresh and passed their gates: vision 0.009-0.023, expert 0.0025 / 0.0018.
+* `run.sh pytorch` and `run.sh hybrid` each did 2 configs x (100 timed calls + 25 scenes x 4 seeds).
 
-Not run in this verification: the full 100-call `pytorch` and `hybrid` runs (their reference numbers are in "What to
-expect"), the PyTorch build in `setup_venv.sh` (an existing venv with the same versions was used), the ONNX export of the
-expert, and `capture_expert_refs.sh`.
+Details are in the report's "How this run was made". Not exercised: the from-source PyTorch build in `setup_venv.sh` (a
+venv with the same wheel was used, for lack of disk) and `prep-scenes` (the validated scene packs were used and checked
+against `checksums/scenes.sha256`).
 
 ## Things that will bite
 
@@ -185,10 +218,12 @@ orinbench/
   model.py           instrumented official rollout (stage clock, seeds, optimizations)
   hybrid.py          the same rollout with the vision forward and flow step routed to the engines
   patches.py         FP16-safe norms, batched vision attention, Conv3d without cuDNN (none change the math)
+  report.py          REPORT.md + figures from a pytorch run, a hybrid run and the engine logs
   runner.py, behavior.py, telemetry.py, envinfo.py, stats.py, timing.py, inputs.py, cli.py
 configs/             smoke, smoke_hybrid, pytorch, hybrid
 scripts/             preflight, setup_venv, export_onnx, capture_expert_refs, verify_artifacts, build_engines, run
-checksums/           SHA256 of the validated ONNX, parity references and scene packs
+checksums/           SHA256 of the checkpoint, the validated ONNX, parity references and scene packs
+reports/             reports of runs (REPORT.md generated by orinbench.report, plus a hand-written analysis)
 data/scenes.yaml     the 25 evaluation scenes
 tests/               CPU tests: patches, padded expert step vs the official call, output pairing
 ```
